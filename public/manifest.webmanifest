@@ -1,0 +1,17 @@
+{
+    "name": "Manhaj Subscription Management",
+    "short_name": "Manhaj",
+    "description": "Premium Subscription Management System for Institutions",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0f172a",
+    "theme_color": "#0f172a",
+    "icons": [
+        {
+            "src": "vite.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any"
+        }
+    ]
+}
