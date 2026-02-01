@@ -40,7 +40,7 @@ export default function AddMember() {
                         required
                         type="text"
                         className="w-full bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-medium placeholder-slate-400 dark:placeholder-slate-500 shadow-sm dark:shadow-none"
-                        placeholder="e.g. Muhammad Sahl"
+                        placeholder="e.g. John Doe"
                         value={formData.name}
                         onChange={e => setFormData({ ...formData, name: e.target.value })}
                     />
