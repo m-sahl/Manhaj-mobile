@@ -3,10 +3,42 @@ import { Moon, Sun, Download, Upload, Trash2, Database, ShieldAlert, ArrowLeft, 
 import { useNavigate } from 'react-router-dom';
 import { initDB } from '../db/db';
 
+import { X } from 'lucide-react';
+
 export default function Settings() {
     const navigate = useNavigate();
     const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
     const [stats, setStats] = useState({ members: 0, payments: 0 });
+
+    // Password Prompt State
+    const [promptState, setPromptState] = useState({
+        isOpen: false,
+        title: '',
+        message: '',
+        onSuccess: null
+    });
+    const [promptPassword, setPromptPassword] = useState('');
+
+    const openPrompt = (title, message, onSuccess) => {
+        setPromptState({ isOpen: true, title, message, onSuccess });
+        setPromptPassword('');
+    };
+
+    const closePrompt = () => {
+        setPromptState({ ...promptState, isOpen: false });
+        setPromptPassword('');
+    };
+
+    const handlePromptSubmit = (e) => {
+        e.preventDefault();
+        const stored = localStorage.getItem('admin_password') || 'admin123';
+        if (promptPassword === stored) {
+            promptState.onSuccess();
+            closePrompt();
+        } else {
+            alert('Incorrect password');
+        }
+    };
 
     useEffect(() => {
         if (theme === 'dark') {
@@ -113,36 +145,31 @@ export default function Settings() {
     };
 
     const handleLogout = () => {
-        const password = prompt("Please confirm your admin password to log out:");
-        if (password === null) return; // Cancelled
-
-        const stored = localStorage.getItem('admin_password') || 'admin123';
-        if (password === stored) {
-            localStorage.removeItem('auth_token');
-            navigate('/login');
-        } else {
-            alert('Incorrect password. Logout cancelled.');
-        }
+        openPrompt(
+            "Confirm Logout",
+            "Please enter your admin password to sign out.",
+            () => {
+                localStorage.removeItem('auth_token');
+                navigate('/login');
+            }
+        );
     };
 
-    const handleReset = async () => {
-        const password = prompt("ENTER ADMIN PASSWORD TO CONFIRM FACTORY RESET.\nThis will permanently delete all data.");
+    const handleReset = () => {
+        openPrompt(
+            "Factory Reset Function",
+            "This action is irreversible. All data will be permanently deleted.",
+            async () => {
+                const db = await initDB();
+                const tx = db.transaction(['members', 'payments'], 'readwrite');
+                await tx.objectStore('members').clear();
+                await tx.objectStore('payments').clear();
+                await tx.done;
 
-        const stored = localStorage.getItem('admin_password') || 'admin123';
-
-        if (password !== stored) {
-            if (password !== null) alert('Incorrect password. Action cancelled.');
-            return;
-        }
-
-        const db = await initDB();
-        const tx = db.transaction(['members', 'payments'], 'readwrite');
-        await tx.objectStore('members').clear();
-        await tx.objectStore('payments').clear();
-        await tx.done;
-
-        alert('Factory Reset Complete. Protocol Zero Initiated.');
-        window.location.reload();
+                alert('Factory Reset Complete. Protocol Zero Initiated.');
+                window.location.reload();
+            }
+        );
     };
 
     return (
@@ -298,6 +325,42 @@ export default function Settings() {
             <div className="text-center">
                 <p className="text-xs text-slate-400 font-mono">Manhaj v1.2.0</p>
             </div>
+
+            {/* Password Validation Modal */}
+            {promptState.isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white dark:bg-slate-800 w-full max-w-sm rounded-[2rem] p-6 shadow-2xl border border-slate-200 dark:border-slate-700 relative">
+                        <button
+                            onClick={closePrompt}
+                            className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
+                        >
+                            <X size={20} />
+                        </button>
+
+                        <div className="text-center mb-6">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">{promptState.title}</h3>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">{promptState.message}</p>
+                        </div>
+
+                        <form onSubmit={handlePromptSubmit} className="space-y-4">
+                            <input
+                                autoFocus
+                                type="password"
+                                placeholder="Enter Admin Password"
+                                value={promptPassword}
+                                onChange={e => setPromptPassword(e.target.value)}
+                                className="w-full text-center text-lg font-bold tracking-widest px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                            />
+                            <button
+                                type="submit"
+                                className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg shadow-blue-500/30 active:scale-95 transition-all"
+                            >
+                                Confirm Access
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

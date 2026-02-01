@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, FileText, LogOut, ArrowLeft, Settings } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, ArrowLeft, Settings } from 'lucide-react';
 import { useEffect } from 'react';
 
 export default function Layout() {
@@ -15,10 +15,6 @@ export default function Layout() {
         }
     }, []);
 
-    const handleLogout = () => {
-        localStorage.removeItem('auth_token');
-        navigate('/login');
-    };
 
     const getPageTitle = () => {
         const path = location.pathname;
@@ -51,12 +47,6 @@ export default function Layout() {
                             {getPageTitle()}
                         </h1>
                     </div>
-                    <button
-                        onClick={handleLogout}
-                        className="p-2 rounded-full active-scale text-slate-500"
-                    >
-                        <LogOut size={18} />
-                    </button>
                 </div>
             </header>
 
