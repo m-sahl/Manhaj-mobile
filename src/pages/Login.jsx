@@ -8,7 +8,7 @@ export default function Login() {
 
     const handleLogin = (e) => {
         e.preventDefault();
-        const storedPassword = localStorage.getItem('admin_password') || 'admin123';
+        const storedPassword = localStorage.getItem('admin_password') || 'admin4321';
         if (password === storedPassword) {
             localStorage.setItem('auth_token', 'valid_token');
             // Ensure theme is initialized
