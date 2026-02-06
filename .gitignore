@@ -6,3 +6,4 @@ build/
 *.log
 ios/Pods/
 android/.gradle/
+.env.local

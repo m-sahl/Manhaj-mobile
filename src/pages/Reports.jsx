@@ -1,34 +1,24 @@
-import { useEffect, useState } from 'react';
-import { getAllPayments, getMembers } from '../db/db';
-import { format, isSameDay, isSameMonth } from 'date-fns';
+import { useState, useMemo } from 'react';
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { format, isSameDay, isSameMonth, parseISO } from 'date-fns';
 import { FileText, TrendingUp, Download } from 'lucide-react';
 
 export default function Reports() {
-    const [payments, setPayments] = useState([]);
-    const [members, setMembers] = useState([]);
+    const rawPayments = useQuery(api.payments.list) || [];
+    const members = useQuery(api.members.list) || [];
     const [filter, setFilter] = useState('month'); // 'day', 'month', 'all'
 
-    useEffect(() => {
-        loadData();
-    }, []);
-
-    const loadData = async () => {
-        const [pData, mData] = await Promise.all([
-            getAllPayments(),
-            getMembers()
-        ]);
-        // Sort desc
-        pData.sort((a, b) => new Date(b.date) - new Date(a.date));
-        setPayments(pData);
-        setMembers(mData);
-    };
+    const payments = useMemo(() => {
+        return [...rawPayments].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }, [rawPayments]);
 
     const getMemberName = (id) => {
-        const m = members.find(m => m.id === id);
+        const m = members.find(m => m._id === id);
         return m ? m.name : 'Unknown';
     };
 
-    const getFilteredPayments = () => {
+    const filtered = useMemo(() => {
         const now = new Date();
         return payments.filter(p => {
             const d = new Date(p.date);
@@ -36,11 +26,15 @@ export default function Reports() {
             if (filter === 'month') return isSameMonth(d, now);
             return true;
         });
-    };
+    }, [payments, filter]);
+
+    const total = useMemo(() => {
+        return filtered.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+    }, [filtered]);
 
     const handleDownloadPDF = () => {
-        const filtered = getFilteredPayments();
-        if (filtered.length === 0) {
+        const filteredData = filtered;
+        if (filteredData.length === 0) {
             alert('No records to download');
             return;
         }
@@ -63,7 +57,7 @@ export default function Reports() {
         const tableRows = filtered.map(p => [
             getMemberName(p.memberId),
             `Rs. ${p.amount}`,
-            p.forMonth !== undefined ? format(new Date(p.forYear, p.forMonth), 'MMM yyyy') : 'Manual',
+            p.forMonth ? `${p.forMonth} ${p.forYear}` : 'General',
             format(new Date(p.date), 'dd MMM yyyy'),
             p.mode || 'Payment'
         ]);
@@ -89,8 +83,7 @@ export default function Reports() {
         doc.save(`Manhaj_Report_${filter}_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
     };
 
-    const filtered = getFilteredPayments();
-    const total = filtered.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
 
     return (
         <div className="animate-fade-in space-y-6 pb-20">
@@ -140,9 +133,9 @@ export default function Reports() {
                     <div className="text-center py-10 text-slate-500">No records found for this period.</div>
                 ) : (
                     filtered.map(p => (
-                        <div key={p.id} className="bg-white dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700/50 p-4 rounded-xl flex justify-between items-center group active:scale-[0.99] transition-all shadow-sm dark:shadow-none">
+                        <div key={p._id} className="bg-white dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700/50 p-4 rounded-xl flex justify-between items-center group active:scale-[0.99] transition-all shadow-sm dark:shadow-none">
                             <div className="flex items-center space-x-3">
-                                <div className={`p-2 rounded-lg ${p.forMonth !== undefined ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-500' : 'bg-blue-100 dark:bg-blue-500/10 text-blue-600 dark:text-blue-500'}`}>
+                                <div className={`p-2 rounded-lg ${p.forMonth ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-500' : 'bg-blue-100 dark:bg-blue-500/10 text-blue-600 dark:text-blue-500'}`}>
                                     <FileText size={18} />
                                 </div>
                                 <div>
@@ -150,8 +143,8 @@ export default function Reports() {
                                         <p className="text-slate-900 dark:text-white text-sm font-black">{getMemberName(p.memberId)}</p>
                                         <span className="w-1 h-1 bg-slate-300 dark:bg-slate-600 rounded-full"></span>
                                         <p className="text-slate-500 dark:text-slate-400 text-[11px] font-bold uppercase tracking-tighter">
-                                            {p.forMonth !== undefined
-                                                ? format(new Date(p.forYear, p.forMonth), 'MMM yyyy')
+                                            {p.forMonth
+                                                ? `${p.forMonth.slice(0, 3)} ${p.forYear}`
                                                 : 'General'
                                             }
                                         </p>
@@ -162,7 +155,7 @@ export default function Reports() {
                                 </div>
                             </div>
                             <div className="text-right">
-                                <span className={`font-black block ${p.forMonth !== undefined ? 'text-emerald-500 dark:text-emerald-400' : 'text-blue-500 dark:text-blue-400'}`}>₹{p.amount}</span>
+                                <span className={`font-black block ${p.forMonth ? 'text-emerald-500 dark:text-emerald-400' : 'text-blue-500 dark:text-blue-400'}`}>₹{p.amount}</span>
                                 <span className="text-[9px] text-slate-400 dark:text-slate-500 uppercase font-bold tracking-tighter">{p.mode || 'Payment'}</span>
                             </div>
                         </div>

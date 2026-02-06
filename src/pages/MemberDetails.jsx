@@ -1,65 +1,69 @@
-import { useEffect, useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getPaymentsByMember, toggleMonthPaid, deleteMember, getMemberWithBalance, updateMember, recordPayment, deletePayment } from '../db/db';
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { calculateMemberStats } from '../utils/stats';
 import { Phone, Trash2, CheckCircle2, History, Clock, Edit2, X, Save, CreditCard, ArrowRight } from 'lucide-react';
 import { format, startOfMonth, addMonths, isBefore, parseISO } from 'date-fns';
 
 export default function MemberDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
-    const [member, setMember] = useState(null);
-    const [payments, setPayments] = useState([]);
-    const [loading, setLoading] = useState(true);
+
+    const memberData = useQuery(api.members.get, { id });
+    const paymentsData = useQuery(api.payments.list, { memberId: id });
+
+    const updateMemberMutation = useMutation(api.members.update);
+    const deleteMemberMutation = useMutation(api.members.remove);
+    const addPaymentMutation = useMutation(api.payments.add);
+    const deletePaymentMutation = useMutation(api.payments.remove);
+    const toggleMonthMutation = useMutation(api.payments.toggleMonth);
+
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editData, setEditData] = useState(null);
     const [selectedMonthStatus, setSelectedMonthStatus] = useState(null);
-    const [isDeleteMemberModalOpen, setIsDeleteMemberModalOpen] = useState(false); // Renamed for clarity
+    const [isDeleteMemberModalOpen, setIsDeleteMemberModalOpen] = useState(false);
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
     const [isCustomAmountModalOpen, setIsCustomAmountModalOpen] = useState(false);
     const [selectedMonthDate, setSelectedMonthDate] = useState(null);
     const [isRevertModalOpen, setIsRevertModalOpen] = useState(false);
     const [paymentToRevert, setPaymentToRevert] = useState(null);
-    const [paymentAmount, setPaymentAmount] = useState('');
     const [customAmount, setCustomAmount] = useState('');
 
-    useEffect(() => {
-        loadData();
-    }, [id]);
-
-    const loadData = async () => {
-        try {
-            const m = await getMemberWithBalance(id);
-            if (!m) {
-                alert('Member not found');
-                navigate('/members');
-                return;
-            }
-            setMember(m);
-            setEditData({
-                name: m.name,
-                phone: m.phone,
-                subscriptionAmount: m.subscriptionAmount,
-                joinDate: m.joinDate
-            });
-
-            const p = await getPaymentsByMember(parseInt(id));
-            // Sort payments by recorded date (newest first)
-            p.sort((a, b) => new Date(b.date) - new Date(a.date));
-            setPayments(p);
-            setLoading(false);
-        } catch (error) {
-            console.error("Error loading member details:", error);
+    const member = useMemo(() => {
+        if (memberData && paymentsData) {
+            return calculateMemberStats(memberData, paymentsData);
         }
-    };
+        return null;
+    }, [memberData, paymentsData]);
+
+    const payments = useMemo(() => {
+        if (!paymentsData) return [];
+        return [...paymentsData].sort((a, b) => new Date(b.date) - new Date(a.date));
+    }, [paymentsData]);
 
     const handlePostPayment = async (amount, isFull = false) => {
-        if (isFull) {
-            await recordPayment(member.id, amount, selectedMonthDate.getMonth(), selectedMonthDate.getFullYear());
-        } else {
-            await recordPayment(member.id, amount);
+        try {
+            if (isFull) {
+                await addPaymentMutation({
+                    memberId: id,
+                    amount: parseFloat(amount),
+                    forMonth: format(selectedMonthDate, 'MMMM'),
+                    forYear: selectedMonthDate.getFullYear(),
+                    mode: 'Full Payment'
+                });
+            } else {
+                await addPaymentMutation({
+                    memberId: id,
+                    amount: parseFloat(amount),
+                    mode: 'Payment'
+                });
+            }
+            setIsPaymentModalOpen(false);
+        } catch (error) {
+            console.error(error);
+            alert('Failed to record payment');
         }
-        setIsPaymentModalOpen(false);
-        loadData();
     };
 
     const handleCustomPayment = async (e) => {
@@ -70,21 +74,26 @@ export default function MemberDetails() {
             return;
         }
 
-        // Record the payment with the month/year context of the selected grid item
-        if (selectedMonthDate) {
-            await recordPayment(member.id, amount, selectedMonthDate.getMonth(), selectedMonthDate.getFullYear());
-        } else {
-            await recordPayment(member.id, amount);
-        }
+        try {
+            await addPaymentMutation({
+                memberId: id,
+                amount,
+                forMonth: selectedMonthDate ? format(selectedMonthDate, 'MMMM') : undefined,
+                forYear: selectedMonthDate ? selectedMonthDate.getFullYear() : undefined,
+                mode: selectedMonthDate ? 'Monthly Fee' : 'Payment'
+            });
 
-        setIsCustomAmountModalOpen(false);
-        setCustomAmount('');
-        loadData();
+            setIsCustomAmountModalOpen(false);
+            setCustomAmount('');
+        } catch (error) {
+            console.error(error);
+            alert('Failed to record payment');
+        }
     };
 
-    const handleDeleteMember = async () => { // Renamed for clarity
+    const handleDeleteMember = async () => {
         if (confirm('Are you sure you want to delete this member?')) {
-            await deleteMember(parseInt(id));
+            await deleteMemberMutation({ id });
             navigate('/members');
         }
     };
@@ -92,19 +101,28 @@ export default function MemberDetails() {
     const handleUpdateMember = async (e) => {
         e.preventDefault();
         try {
-            await updateMember({
-                ...member,
-                ...editData
+            await updateMemberMutation({
+                id,
+                ...editData,
+                subscriptionAmount: parseFloat(editData.subscriptionAmount),
+                active: member.active
             });
             setIsEditModalOpen(false);
-            loadData();
         } catch (error) {
             console.error(error);
             alert('Failed to update member');
         }
     };
 
-    if (loading || !member) return <div className="p-10 text-center text-slate-500">Loading...</div>;
+    const handleConfirmRevert = async () => {
+        if (paymentToRevert) {
+            await deletePaymentMutation({ id: paymentToRevert._id });
+            setIsRevertModalOpen(false);
+            setPaymentToRevert(null);
+        }
+    };
+
+    if (!member) return <div className="p-10 text-center text-slate-500">Loading...</div>;
 
     // Calculate grid items using chronological coverage logic
     const joinDate = startOfMonth(parseISO(member.joinDate));
@@ -186,9 +204,9 @@ export default function MemberDetails() {
             }
 
             // Find the specific record for this month
-            const month = item.date?.getMonth();
-            const year = item.date?.getFullYear();
-            const p = month !== undefined ? payments.find(p => p.forMonth === month && p.forYear === year) : null;
+            const monthName = format(item.date, 'MMMM');
+            const year = item.date.getFullYear();
+            const p = payments.find(p => p.forMonth === monthName && p.forYear === year);
 
             if (p) {
                 setPaymentToRevert(p);
@@ -220,14 +238,6 @@ export default function MemberDetails() {
         }
     };
 
-    const handleConfirmRevert = async () => {
-        if (paymentToRevert) {
-            await deletePayment(paymentToRevert.id);
-            setIsRevertModalOpen(false);
-            setPaymentToRevert(null);
-            loadData();
-        }
-    };
 
     // Filter payments to only show monthly fee records for the history list
     const monthWiseHistory = payments.filter(p => p.forMonth !== undefined);
@@ -324,7 +334,7 @@ export default function MemberDetails() {
                         <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest mt-0.5">TAP TO TOGGLE STATUS</p>
                     </div>
                     <div className="bg-slate-900 text-white px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter">
-                        ID: #{member.id}
+                        ID: {member._id.slice(0, 8)}...
                     </div>
                 </div>
 
@@ -393,7 +403,7 @@ export default function MemberDetails() {
 
                     <div className="space-y-3">
                         {payments.map((p) => (
-                            <div key={p.id} className="bg-white dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700/30 p-4 rounded-2xl flex justify-between items-center group active:scale-98 transition-all relative overflow-hidden shadow-sm dark:shadow-none">
+                            <div key={p._id} className="bg-white dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700/30 p-4 rounded-2xl flex justify-between items-center group active:scale-98 transition-all relative overflow-hidden shadow-sm dark:shadow-none">
                                 <div className="flex items-center space-x-3">
                                     <div className={`p-2 rounded-xl ${p.forMonth !== undefined ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-500' : 'bg-blue-100 dark:bg-blue-500/10 text-blue-600 dark:text-blue-500'}`}>
                                         <CheckCircle2 size={18} />

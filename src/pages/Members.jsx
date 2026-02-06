@@ -1,23 +1,20 @@
-import { useEffect, useState } from 'react';
-import { getMembersWithStats } from '../db/db';
+import { useState } from 'react';
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { calculateMemberStats } from '../utils/stats';
 import { Search, User, ChevronRight, Plus } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 export default function Members() {
-    const [members, setMembers] = useState([]);
+    const membersData = useQuery(api.members.list);
+    const paymentsData = useQuery(api.payments.list, {});
     const [search, setSearch] = useState('');
     const navigate = useNavigate();
 
-    useEffect(() => {
-        loadMembers();
-    }, []);
-
-    const loadMembers = async () => {
-        const data = await getMembersWithStats();
-        // Sort by name
-        data.sort((a, b) => a.name.localeCompare(b.name));
-        setMembers(data);
-    };
+    const members = (membersData && paymentsData)
+        ? membersData.map(m => calculateMemberStats(m, paymentsData))
+            .sort((a, b) => a.name.localeCompare(b.name))
+        : [];
 
     const filteredMembers = members.filter(m =>
         m.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -46,8 +43,8 @@ export default function Members() {
                 ) : (
                     filteredMembers.map(member => (
                         <Link
-                            key={member.id}
-                            to={`/members/${member.id}`}
+                            key={member._id}
+                            to={`/members/${member._id}`}
                             className="bg-white dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800 active:bg-slate-100 dark:active:bg-slate-700 backdrop-blur-sm p-4 rounded-xl border border-slate-200 dark:border-slate-700/50 flex items-center justify-between transition-all group no-underline shadow-sm dark:shadow-none"
                         >
                             <div className="flex items-center space-x-4">

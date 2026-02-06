@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
-import { getDashboardStats } from '../db/db';
+import { useState } from 'react';
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { calculateMemberStats } from '../utils/stats';
 import { Users, CreditCard, AlertCircle, Plus, ChevronRight, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -23,16 +25,20 @@ const StatCard = ({ title, value, icon: Icon, color, subtext, onClick, active })
 );
 
 export default function Dashboard() {
-    const [stats, setStats] = useState({ totalMembers: 0, totalCollected: 0, totalPending: 0, members: [], pendingMembers: [] });
+    const membersData = useQuery(api.members.list);
+    const paymentsData = useQuery(api.payments.list, {});
     const [selectedTab, setSelectedTab] = useState(null); // 'total' or 'pending'
 
-    useEffect(() => {
-        loadStats();
-    }, []);
+    const members = (membersData && paymentsData)
+        ? membersData.map(m => calculateMemberStats(m, paymentsData))
+        : [];
 
-    const loadStats = async () => {
-        const data = await getDashboardStats();
-        setStats(data);
+    const stats = {
+        totalMembers: members.length,
+        totalCollected: (paymentsData || []).reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0),
+        totalPending: members.reduce((sum, m) => sum + (m.balance > 0 ? m.balance : 0), 0),
+        members,
+        pendingMembers: members.filter(m => m.balance > 0)
     };
 
     return (
@@ -79,8 +85,8 @@ export default function Dashboard() {
                     <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-700">
                         {(selectedTab === 'total' ? stats.members : stats.pendingMembers).map(member => (
                             <Link
-                                key={member.id}
-                                to={`/members/${member.id}`}
+                                key={member._id}
+                                to={`/members/${member._id}`}
                                 className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700/30 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all group active:scale-[0.99] shadow-sm dark:shadow-none"
                             >
                                 <div className="flex items-center space-x-3">
@@ -89,7 +95,7 @@ export default function Dashboard() {
                                     </div>
                                     <div>
                                         <p className="text-sm font-bold text-slate-900 dark:text-white leading-none">{member.name}</p>
-                                        <p className="text-[10px] text-slate-500 mt-1 uppercase font-bold tracking-tighter">ID: #{member.id}</p>
+                                        <p className="text-[10px] text-slate-500 mt-1 uppercase font-bold tracking-tighter">Member ID: {member._id.slice(0, 8)}...</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center space-x-4">

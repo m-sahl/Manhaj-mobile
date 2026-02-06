@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { addMember } from '../db/db';
+import { useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { ArrowLeft, Save } from 'lucide-react';
 
 export default function AddMember() {
     const navigate = useNavigate();
+    const addMember = useMutation(api.members.add);
     const [formData, setFormData] = useState({
         name: '',
         phone: '',
@@ -20,7 +22,11 @@ export default function AddMember() {
         e.preventDefault();
         setLoading(true);
         try {
-            await addMember(formData);
+            await addMember({
+                ...formData,
+                subscriptionAmount: parseFloat(formData.subscriptionAmount),
+                balance: parseFloat(formData.balance) || 0,
+            });
             navigate('/members');
         } catch (error) {
             console.error(error);

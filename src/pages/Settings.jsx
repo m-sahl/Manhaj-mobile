@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Moon, Sun, Download, Upload, Trash2, Database, ShieldAlert, ArrowLeft, KeyRound } from 'lucide-react';
+import { Moon, Sun, Download, Upload, Trash2, Database, ShieldAlert, ArrowLeft, KeyRound, CloudUpload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { initDB } from '../db/db';
+import { useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { migrateToConvex } from '../utils/migrate';
 
 import { X } from 'lucide-react';
 
@@ -40,6 +43,10 @@ export default function Settings() {
         }
     };
 
+    const cloudMembers = useQuery(api.members.list) || [];
+    const cloudPayments = useQuery(api.payments.list) || [];
+    const [localStats, setLocalStats] = useState({ members: 0, payments: 0 });
+
     useEffect(() => {
         if (theme === 'dark') {
             document.documentElement.classList.add('dark');
@@ -47,48 +54,39 @@ export default function Settings() {
             document.documentElement.classList.remove('dark');
         }
         localStorage.setItem('theme', theme);
-        loadStats();
+        loadLocalStats();
     }, [theme]);
 
-    const loadStats = async () => {
-        const db = await initDB();
-        const m = await db.count('members');
-        const p = await db.count('payments');
-        setStats({ members: m, payments: p });
+    const loadLocalStats = async () => {
+        try {
+            const db = await initDB();
+            const m = await db.count('members');
+            const p = await db.count('payments');
+            setLocalStats({ members: m, payments: p });
+        } catch (e) {
+            console.log("No local DB found or not yet initialized");
+        }
     };
 
-    const toggleTheme = () => {
-        setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+    const handleCloudBackup = async () => {
+        const data = {
+            version: 1,
+            timestamp: new Date().toISOString(),
+            members: cloudMembers,
+            payments: cloudPayments
+        };
+
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Manhaj_Cloud_Backup_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
-
-
-    // Password Management State
-    const [isChangingPassword, setIsChangingPassword] = useState(false);
-    const [passData, setPassData] = useState({ current: '', new: '', confirm: '' });
-
-    const handleChangePassword = () => {
-        const stored = localStorage.getItem('admin_password') || 'admin123';
-        if (passData.current !== stored) {
-            alert('Current password is incorrect');
-            return;
-        }
-        if (passData.new.length < 4) {
-            alert('New password must be at least 4 characters');
-            return;
-        }
-        if (passData.new !== passData.confirm) {
-            alert('New passwords do not match');
-            return;
-        }
-
-        localStorage.setItem('admin_password', passData.new);
-        alert('Password updated successfully');
-        setIsChangingPassword(false);
-        setPassData({ current: '', new: '', confirm: '' });
-    };
-
-    const handleBackup = async () => {
+    const handleLocalBackup = async () => {
         const db = await initDB();
         const members = await db.getAll('members');
         const payments = await db.getAll('payments');
@@ -104,7 +102,7 @@ export default function Settings() {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `Manhaj_Backup_${new Date().toISOString().split('T')[0]}.json`;
+        link.download = `Manhaj_Local_Legacy_Backup_${new Date().toISOString().split('T')[0]}.json`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -153,6 +151,24 @@ export default function Settings() {
                 navigate('/login');
             }
         );
+    };
+
+    const addMemberMutation = useMutation(api.members.add);
+    const addPaymentMutation = useMutation(api.payments.add);
+    const [migrating, setMigrating] = useState(false);
+
+    const handleMigrate = async () => {
+        if (!confirm('This will copy all your local data to Convex cloud. Existing cloud data will remain. Proceed?')) return;
+
+        setMigrating(true);
+        try {
+            await migrateToConvex(addMemberMutation, addPaymentMutation);
+            alert('Migration successful!');
+        } catch (error) {
+            alert('Migration failed. See console for details.');
+        } finally {
+            setMigrating(false);
+        }
     };
 
     const handleReset = () => {
@@ -264,37 +280,71 @@ export default function Settings() {
                 <h3 className="text-sm font-black uppercase tracking-widest text-slate-500 ml-2">Data Management</h3>
 
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700/50 space-y-6">
-                    {/* Stats */}
+                    {/* Stats Grid */}
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-700">
-                            <p className="text-xs text-slate-500 uppercase font-black">Members</p>
-                            <p className="text-xl font-bold text-slate-900 dark:text-white">{stats.members}</p>
+                        <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-500/20">
+                            <p className="text-[10px] text-blue-500 uppercase font-black tracking-widest mb-1">Cloud Database</p>
+                            <div className="flex items-baseline space-x-2">
+                                <span className="text-2xl font-black text-slate-900 dark:text-white">{cloudMembers.length}</span>
+                                <span className="text-xs text-slate-500 font-bold">Members</span>
+                            </div>
+                            <div className="flex items-baseline space-x-2 mt-1">
+                                <span className="text-lg font-bold text-slate-700 dark:text-slate-300">{cloudPayments.length}</span>
+                                <span className="text-[10px] text-slate-500 font-medium lowercase">Payments</span>
+                            </div>
                         </div>
+
                         <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-700">
-                            <p className="text-xs text-slate-500 uppercase font-black">Records</p>
-                            <p className="text-xl font-bold text-slate-900 dark:text-white">{stats.payments}</p>
+                            <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-1">Legacy Local</p>
+                            <div className="flex items-baseline space-x-2">
+                                <span className="text-2xl font-black text-slate-900 dark:text-white">{localStats.members}</span>
+                                <span className="text-xs text-slate-500 font-bold">Members</span>
+                            </div>
+                            <div className="flex items-baseline space-x-2 mt-1">
+                                <span className="text-lg font-bold text-slate-700 dark:text-slate-300">{localStats.payments}</span>
+                                <span className="text-[10px] text-slate-500 font-medium lowercase">Payments</span>
+                            </div>
                         </div>
                     </div>
 
                     {/* Actions */}
                     <div className="space-y-3">
                         <button
-                            onClick={handleBackup}
-                            className="w-full flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-xl font-bold hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-all active:scale-98"
+                            onClick={handleCloudBackup}
+                            className="w-full flex items-center justify-between p-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-500 transition-all active:scale-98 shadow-lg shadow-blue-500/20"
                         >
                             <div className="flex items-center space-x-3">
-                                <Download size={20} />
-                                <span>Backup Data (JSON)</span>
+                                <CloudUpload size={20} />
+                                <span>Backup Cloud Data (JSON)</span>
                             </div>
                         </button>
 
-                        <label className="w-full flex items-center justify-between p-4 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl font-bold hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-all active:scale-98 cursor-pointer">
+                        <button
+                            onClick={handleMigrate}
+                            disabled={migrating}
+                            className="w-full flex items-center justify-between p-4 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl font-bold hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-all active:scale-98 disabled:opacity-50"
+                        >
                             <div className="flex items-center space-x-3">
-                                <Upload size={20} />
-                                <span>Restore Data</span>
+                                <Database size={20} />
+                                <span>{migrating ? 'Migrating...' : 'Migrate Local to Cloud'}</span>
                             </div>
-                            <input type="file" accept=".json" onChange={handleRestore} className="hidden" />
-                        </label>
+                        </button>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                onClick={handleLocalBackup}
+                                className="flex items-center justify-center space-x-2 p-3 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-bold text-xs hover:bg-slate-200 dark:hover:bg-slate-600 transition-all"
+                            >
+                                <Download size={14} />
+                                <span>Legacy Backup</span>
+                            </button>
+
+                            <label className="flex items-center justify-center space-x-2 p-3 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-bold text-xs hover:bg-slate-200 dark:hover:bg-slate-600 transition-all cursor-pointer">
+                                <Upload size={14} />
+                                <span>Legacy Restore</span>
+                                <input type="file" accept=".json" onChange={handleRestore} className="hidden" />
+                            </label>
+                        </div>
                     </div>
                 </div>
             </section>
