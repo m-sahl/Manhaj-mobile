@@ -17,7 +17,7 @@ export default function MemberDetails() {
     const deleteMemberMutation = useMutation(api.members.remove);
     const addPaymentMutation = useMutation(api.payments.add);
     const deletePaymentMutation = useMutation(api.payments.remove);
-    const toggleMonthMutation = useMutation(api.toggleMonth || api.payments.toggleMonth); // Handle potential drift
+    const toggleMonthMutation = useMutation(api.payments.toggleMonth);
 
     const parseMonth = (monthName, year) => {
         const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -253,7 +253,17 @@ export default function MemberDetails() {
                     </div>
                     <div className="flex space-x-2">
                         <button
-                            onClick={() => setIsEditModalOpen(true)}
+                            onClick={() => {
+                                setEditData({
+                                    name: member.name,
+                                    phone: member.phone,
+                                    subscriptionAmount: member.subscriptionAmount,
+                                    subscriptionType: member.subscriptionType || 'Monthly',
+                                    email: member.email || '',
+                                    joinDate: member.joinDate
+                                });
+                                setIsEditModalOpen(true);
+                            }}
                             className="p-3 bg-slate-100 dark:bg-slate-700/50 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-2xl text-slate-500 dark:text-slate-300 transition-all border border-slate-200 dark:border-slate-600/30"
                         >
                             <Edit2 size={18} />
@@ -461,6 +471,16 @@ export default function MemberDetails() {
                                 />
                             </div>
                             <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Email (Optional)</label>
+                                <input
+                                    type="email"
+                                    className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                                    placeholder="e.g. name@example.com"
+                                    value={editData.email}
+                                    onChange={e => setEditData({ ...editData, email: e.target.value })}
+                                />
+                            </div>
+                            <div className="space-y-2">
                                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Phone Number</label>
                                 <input
                                     required
@@ -479,6 +499,18 @@ export default function MemberDetails() {
                                     value={editData.subscriptionAmount}
                                     onChange={e => setEditData({ ...editData, subscriptionAmount: e.target.value })}
                                 />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Cycle</label>
+                                <select
+                                    className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 appearance-none"
+                                    value={editData.subscriptionType}
+                                    onChange={e => setEditData({ ...editData, subscriptionType: e.target.value })}
+                                >
+                                    <option>Monthly</option>
+                                    <option>Yearly</option>
+                                    <option>One-Time</option>
+                                </select>
                             </div>
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Join Date</label>

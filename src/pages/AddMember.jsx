@@ -37,7 +37,20 @@ export default function AddMember() {
     };
 
     return (
-        <div className="animate-fade-in relative min-h-[80vh]">
+        <div className="animate-fade-in relative min-h-[80vh] space-y-6">
+            <div className="flex items-center space-x-4 mb-2">
+                <button
+                    onClick={() => navigate(-1)}
+                    className="p-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 active:scale-90 transition-all shadow-sm"
+                >
+                    <ArrowLeft size={20} />
+                </button>
+                <div>
+                    <h1 className="text-xl font-bold text-slate-900 dark:text-white">Add New Member</h1>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Fill in the details to register</p>
+                </div>
+            </div>
+
             <form onSubmit={handleSubmit} className="space-y-4">
 
                 <div className="space-y-2">

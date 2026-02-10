@@ -48,6 +48,7 @@ export const update = mutation({
         email: v.optional(v.string()),
         subscriptionAmount: v.number(),
         subscriptionType: v.string(),
+        joinDate: v.string(),
         active: v.boolean(),
     },
     handler: async (ctx, args) => {
