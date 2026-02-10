@@ -70,7 +70,7 @@ export default function Layout() {
 
                     <NavLink
                         to="/members"
-                        className={({ isActive }) => `flex flex-col items-center justify-center w-full h-full space-y-1 transition-all ${isActive ? 'text-blue-400' : 'text-slate-500 hover:text-slate-200'}`}
+                        className={({ isActive }) => `flex flex-col items-center justify-center w-full h-full space-y-1 transition-all ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`}
                     >
                         <Users size={22} className={location.pathname === '/members' ? 'scale-110' : ''} />
                         <span className="text-[10px] font-black uppercase tracking-tighter">Directory</span>
@@ -78,7 +78,7 @@ export default function Layout() {
 
                     <NavLink
                         to="/reports"
-                        className={({ isActive }) => `flex flex-col items-center justify-center w-full h-full space-y-1 transition-all ${isActive ? 'text-blue-400' : 'text-slate-500 hover:text-slate-200'}`}
+                        className={({ isActive }) => `flex flex-col items-center justify-center w-full h-full space-y-1 transition-all ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`}
                     >
                         <FileText size={22} className={location.pathname === '/reports' ? 'scale-110' : ''} />
                         <span className="text-[10px] font-black uppercase tracking-tighter">Reports</span>
@@ -86,7 +86,7 @@ export default function Layout() {
 
                     <NavLink
                         to="/settings"
-                        className={({ isActive }) => `flex flex-col items-center justify-center w-full h-full space-y-1 transition-all ${isActive ? 'text-blue-400' : 'text-slate-500 hover:text-slate-200'}`}
+                        className={({ isActive }) => `flex flex-col items-center justify-center w-full h-full space-y-1 transition-all ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`}
                     >
                         <Settings size={22} className={location.pathname === '/settings' ? 'scale-110' : ''} />
                         <span className="text-[10px] font-black uppercase tracking-tighter">Settings</span>

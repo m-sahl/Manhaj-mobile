@@ -17,7 +17,13 @@ export default function MemberDetails() {
     const deleteMemberMutation = useMutation(api.members.remove);
     const addPaymentMutation = useMutation(api.payments.add);
     const deletePaymentMutation = useMutation(api.payments.remove);
-    const toggleMonthMutation = useMutation(api.payments.toggleMonth);
+    const toggleMonthMutation = useMutation(api.toggleMonth || api.payments.toggleMonth); // Handle potential drift
+
+    const parseMonth = (monthName, year) => {
+        const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        const monthIndex = months.indexOf(monthName);
+        return new Date(year, monthIndex !== -1 ? monthIndex : 0);
+    };
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editData, setEditData] = useState(null);
@@ -217,23 +223,9 @@ export default function MemberDetails() {
             }
         } else {
             // Unpaid or Partial
-            let recordToRevert = null;
-            if (item.date) {
-                const month = item.date.getMonth();
-                const year = item.date.getFullYear();
-                recordToRevert = payments.find(p => p.forMonth === month && p.forYear === year);
-            }
-
-            // If it's a partial month and no specific record exists for that month,
-            // fallback to the most recent payment to allow some form of revert action.
-            if (!recordToRevert && item.status === 'partial') {
-                recordToRevert = payments[0];
-            }
-
-            setPaymentToRevert(recordToRevert);
+            setPaymentToRevert(null);
             setSelectedMonthDate(item.date || new Date());
             setSelectedMonthStatus(item.status);
-            setPaymentAmount(member.subscriptionAmount);
             setIsPaymentModalOpen(true);
         }
     };
@@ -411,7 +403,7 @@ export default function MemberDetails() {
                                     <div className="relative z-10">
                                         <p className="text-sm font-bold text-slate-900 dark:text-white capitalize leading-tight">
                                             {p.forMonth !== undefined
-                                                ? `${p.mode === 'Monthly Fee' ? 'Monthly Fee:' : 'Partial Pay:'} ${format(new Date(p.forYear, p.forMonth), 'MMMM yyyy')}`
+                                                ? `${p.mode === 'Monthly Fee' ? 'Monthly Fee:' : 'Partial Pay:'} ${p.forMonth} ${p.forYear}`
                                                 : 'Manual Payment'}
                                         </p>
                                         <div className="flex items-center space-x-1 text-slate-500 mt-1">
@@ -431,7 +423,7 @@ export default function MemberDetails() {
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             setPaymentToRevert(p);
-                                            setSelectedMonthDate(p.forMonth !== undefined ? new Date(p.forYear, p.forMonth) : new Date(p.date));
+                                            setSelectedMonthDate(p.forMonth !== undefined ? parseMonth(p.forMonth, p.forYear) : new Date(p.date));
                                             setIsRevertModalOpen(true);
                                         }}
                                         className="p-2.5 bg-rose-50 dark:bg-rose-500/10 text-rose-500 rounded-xl opacity-0 md:opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-500 hover:text-white"
@@ -660,7 +652,7 @@ export default function MemberDetails() {
                             <h3 className="text-2xl font-black text-slate-900 tracking-tight">Delete Payment?</h3>
                             <p className="text-slate-500 font-medium mt-1">
                                 {paymentToRevert.forMonth !== undefined
-                                    ? `Remove payment for ${format(new Date(paymentToRevert.forYear, paymentToRevert.forMonth), 'MMMM yyyy')}?`
+                                    ? `Remove payment for ${paymentToRevert.forMonth} ${paymentToRevert.forYear}?`
                                     : 'Remove this general payment record?'
                                 }
                             </p>

@@ -21,4 +21,7 @@ export default defineSchema({
         forYear: v.optional(v.number()),
         mode: v.string(), // "Full Payment", "Partial Payment", "Monthly Fee", "Payment"
     }).index("by_memberId", ["memberId"]),
+    admins: defineTable({
+        passwordHash: v.string(),
+    }),
 });
